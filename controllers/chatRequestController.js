@@ -8,6 +8,7 @@ const User = require('../models/User'); // Ensure the User model is imported
 exports.getChatRequests = async (req, res) => {
   try {
     const userId = req.user.id;
+    console.log("Fetching chat requests for user ID:", userId);
 
     // Fetch chat requests where the user is the commenter
     const requests = await ChatRequest.find({ commenter: userId })
@@ -15,13 +16,18 @@ exports.getChatRequests = async (req, res) => {
       .populate('postId', 'title') // Populate post title
       .sort({ createdAt: -1 }); // Sort by most recent
 
-    // Transform the requests to include only necessary data
-    const transformedRequests = requests.map((req) => ({
-      _id: req._id,
-      seekerName: req.seeker.username,
-      postTitle: req.postId.title,
-    }));
+    console.log("Fetched chat requests:", requests);
 
+    // Transform the requests to include only necessary data
+    // Transform the requests to include only necessary data
+const transformedRequests = requests.map((req) => ({
+  _id: req._id,
+  seekerName: req.seeker.username,
+  postTitle: req.postId ? req.postId.title : 'No Title', // Handle cases where postId is null
+}));
+
+
+    console.log("Transformed requests:", transformedRequests);
     res.status(200).json(transformedRequests);
   } catch (error) {
     console.error('Error fetching chat requests:', error.message);
@@ -33,6 +39,7 @@ exports.getChatRequests = async (req, res) => {
 exports.sendChatRequest = async (req, res) => {
   try {
     const { commenterId, postId } = req.body;
+    console.log("Sending chat request with commenterId:", commenterId, "and postId:", postId);
 
     if (!commenterId || !postId) {
       return res.status(400).json({ error: 'Commenter ID and Post ID are required.' });
@@ -68,6 +75,8 @@ exports.sendChatRequest = async (req, res) => {
       postId,
     });
 
+    console.log("Chat request created:", chatRequest);
+
     // Get the seeker's username
     const seeker = await User.findById(req.user.id).select('username');
 
@@ -89,6 +98,7 @@ exports.sendChatRequest = async (req, res) => {
 exports.respondChatRequest = async (req, res) => {
   try {
     const { requestId, action } = req.body;
+    console.log("Responding to chat request with requestId:", requestId, "and action:", action);
 
     const chatRequest = await ChatRequest.findById(requestId);
     if (!chatRequest) {
@@ -107,6 +117,8 @@ exports.respondChatRequest = async (req, res) => {
         participants: { $all: [chatRequest.seeker, chatRequest.commenter] },
         postId: chatRequest.postId,
       });
+
+      console.log("Chat room found or created:", chatRoom);
 
       if (!chatRoom) {
         chatRoom = await ChatRoom.create({
@@ -142,8 +154,7 @@ exports.respondChatRequest = async (req, res) => {
 exports.getChatRoomForRequest = async (req, res) => {
   try {
     const { requestId } = req.params;
-
-    console.log("Request Id:",requestId)
+    console.log("Request Id:", requestId);
 
     // Find the chat request
     const chatRequest = await ChatRequest.findById(requestId);
@@ -159,8 +170,6 @@ exports.getChatRoomForRequest = async (req, res) => {
       return res.status(403).json({ error: 'Not authorized to view this chat room.' });
     }
 
-    
-
     // Find the chat room for the given participants and post
     const chatRoom = await ChatRoom.findOne({
       participants: { $all: [chatRequest.seeker, chatRequest.commenter] },
@@ -171,6 +180,7 @@ exports.getChatRoomForRequest = async (req, res) => {
       return res.status(404).json({ error: 'Chat room not found.' });
     }
 
+    console.log("Found chat room:", chatRoom);
     res.status(200).json({ chatRoomId: chatRoom._id });
   } catch (err) {
     console.error('Error fetching chat room ID:', err.message);
@@ -178,26 +188,25 @@ exports.getChatRoomForRequest = async (req, res) => {
   }
 };
 
-
 // Route: GET /api/chat-requests/my-room
 exports.getMyRoom = async (req, res) => {
   try {
     const userId = req.user.id;
+    console.log("Fetching chat room for user ID:", userId);
 
     const room = await ChatRoom.findOne({
       participants: userId,
     });
 
     if (room) {
+      console.log("Chat room found:", room);
       return res.status(200).json({ chatRoomId: room._id });
     }
 
+    console.log("No chat room found for user.");
     return res.status(404).json({ message: 'No chat room found for this user.' });
   } catch (err) {
     console.error('Error finding chat room:', err.message);
     res.status(500).json({ error: 'Failed to retrieve chat room. Please try again.' });
   }
 };
-
-
-
